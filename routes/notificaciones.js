@@ -48,23 +48,41 @@ router.get('/:id', (req, res) => {
 //ENDPOINT PARA "CREAR O AGREGAR" (POST):
 
 router.post('/', (req, res) => {
-  const { pictograma_id, contenido, estado, fecha_hora, tipo, grupo_id } = req.body;
+  const {
+    pictograma_id,
+    titulo,
+    fecha_creacion,
+    categoria,
+    grupo_id,
+    fecha_resuelta,
+    miembro_resolutor
+  } = req.body;
+  console.log(req.body)
+  const missingFields = [];
+  if (!pictograma_id) missingFields.push('pictograma_id');
+  if (!titulo) missingFields.push('titulo');
+  if (!fecha_creacion) missingFields.push('fecha_creacion');
+  if (!categoria) missingFields.push('categoria');
+  if (!grupo_id) missingFields.push('grupo_id');
 
-  if (!contenido || !estado || !fecha_hora || !tipo) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  if (missingFields.length > 0) {
+    return res.status(400).json({ 
+      error: `Faltan los siguientes campos obligatorios: ${missingFields.join(', ')}` 
+    });
   }
 
   const query = `
-    INSERT INTO notificacion (pictograma_id, contenido, estado, fecha_hora, tipo, grupo_id)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO notificacion (pictograma_id, titulo, fecha_creacion, categoria, grupo_id, fecha_resuelta, miembro_resolutor)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *`;
   const values = [
-    pictograma_id || null,
-    contenido,
-    estado,
-    fecha_hora,
-    tipo,
-    grupo_id || null
+    pictograma_id,
+    titulo,
+    fecha_creacion,
+    categoria,
+    grupo_id,
+    fecha_resuelta || null,
+    miembro_resolutor || null
   ];
 
   pool.query(query, values, (err, result) => {
