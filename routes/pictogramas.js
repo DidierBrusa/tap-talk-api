@@ -30,7 +30,10 @@ module.exports = router;
 
 router.get('/:id', (req, res) => {
   const pictogramaId = req.params.id;
-
+  if (!Number.isInteger(parseInt(pictogramaId)) || pictogramaId <= 0) {
+    return res.status(400).json({ error: 'ID de pictograma inválido' });
+  }
+  
   pool.query('SELECT * FROM pictograma WHERE id = $1', [pictogramaId], (err, result) => {
     if (err) {
       console.error('❌ Error al buscar pictograma:', err);
@@ -50,8 +53,28 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const { nombre, imagen, categoria_id } = req.body;
 
+  const errors = [];
+
   if (!nombre) {
-    return res.status(400).json({ error: 'El campo "nombre" es obligatorio' });
+    errors.push('El campo "nombre" es obligatorio');
+  } else if (nombre.length > 100) {
+    errors.push('El nombre no puede exceder los 100 caracteres');
+  }
+
+  if (imagen !== undefined && typeof imagen !== 'string') {
+    errors.push('La imagen debe ser una cadena de texto');
+  }
+
+  if (categoria_id !== undefined && categoria_id !== null) {
+    if (!Number.isInteger(parseInt(categoria_id))) {
+      errors.push('categoria_id debe ser un número entero');
+    } else if (categoria_id <= 0) {
+      errors.push('categoria_id debe ser un número positivo');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ errors });
   }
 
   const query = `
@@ -62,11 +85,13 @@ router.post('/', (req, res) => {
 
   pool.query(query, values, (err, result) => {
     if (err) {
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'La categoría especificada no existe' });
+      }
       console.error('❌ Error al crear pictograma:', err);
-      res.status(500).json({ error: 'Error al crear el pictograma' });
-    } else {
-      res.status(201).json(result.rows[0]);
+      return res.status(500).json({ error: 'Error al crear el pictograma' });
     }
+    res.status(201).json(result.rows[0]);
   });
 });
 
@@ -78,8 +103,28 @@ router.put('/:id', (req, res) => {
   const pictogramaId = req.params.id;
   const { nombre, imagen, categoria_id } = req.body;
 
+  const errors = [];
+
   if (!nombre) {
-    return res.status(400).json({ error: 'El campo "nombre" es obligatorio para actualizar' });
+    errors.push('El campo "nombre" es obligatorio');
+  } else if (nombre.length > 100) {
+    errors.push('El nombre no puede exceder los 100 caracteres');
+  }
+
+  if (imagen !== undefined && typeof imagen !== 'string') {
+    errors.push('La imagen debe ser una cadena de texto');
+  }
+
+  if (categoria_id !== undefined && categoria_id !== null) {
+    if (!Number.isInteger(parseInt(categoria_id))) {
+      errors.push('categoria_id debe ser un número entero');
+    } else if (categoria_id <= 0) {
+      errors.push('categoria_id debe ser un número positivo');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ errors });
   }
 
   const query = `
@@ -93,6 +138,9 @@ router.put('/:id', (req, res) => {
 
   pool.query(query, values, (err, result) => {
     if (err) {
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'La categoría especificada no existe' });
+      }
       console.error('❌ Error al actualizar pictograma:', err);
       res.status(500).json({ error: 'Error al actualizar el pictograma' });
     } else if (result.rows.length === 0) {
@@ -109,12 +157,15 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const pictogramaId = req.params.id;
 
+  if (!Number.isInteger(parseInt(pictogramaId)) || pictogramaId <= 0) {
+    return res.status(400).json({ error: 'ID de pictograma inválido' });
+  }
+
   const query = 'DELETE FROM pictograma WHERE id = $1 RETURNING *';
   const values = [pictogramaId];
 
   pool.query(query, values, (err, result) => {
     if (err) {
-      // Error por clave foránea (por ejemplo, si está en una notificación)
       if (err.code === '23503') {
         return res.status(409).json({
           error: 'No se puede eliminar el pictograma porque está vinculado a otros datos.'

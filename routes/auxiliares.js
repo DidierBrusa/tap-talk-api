@@ -28,6 +28,9 @@ module.exports = router;
 //ENDPOINT "LISTAR SEGUN ID" (GET):
 router.get('/:id', (req, res) => {
   const auxiliarId = req.params.id;
+  if (!auxiliarId || isNaN(auxiliarId)) {
+    return res.status(400).json({ error: 'ID de auxiliar inválido' });
+  }
 
   pool.query('SELECT * FROM auxiliar WHERE id = $1', [auxiliarId], (err, result) => {
     if (err) {
@@ -51,12 +54,17 @@ console.log('➡️ [API] Llegó petición POST /api/auxiliares con body:', req.
 //-------------------
   const { activo, auth_provider, fecha_creacion, email, nombre } = req.body;
 
-  // Validación mínima de campos obligatorios
-  if (activo === undefined || !fecha_creacion || !email || !nombre) {
-    //TO DO
-    console.log('❌ [API] Faltan campos obligatorios en el body:', req.body);
-    //-------------------
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'El email es requerido y debe ser válido' });
+  }
+  if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
+    return res.status(400).json({ error: 'El nombre es requerido y debe tener al menos 2 caracteres' });
+  }
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ error: 'El campo activo debe ser un valor booleano' });
+  }
+  if (!fecha_creacion || isNaN(Date.parse(fecha_creacion))) {
+    return res.status(400).json({ error: 'La fecha de creación es requerida y debe ser válida' });
   }
     //TO DO: LOG PARA CHEQUEAR QUE SE CREA BIEN
     console.log('🟢 [API] Todos los campos obligatorios están presentes:')
@@ -108,6 +116,21 @@ router.put('/:id', (req, res) => {
     WHERE id = $6
     RETURNING *`;
   const values = [activo, auth_provider || null, fecha_creacion, email, nombre, auxiliarId];
+  if (!auxiliarId || isNaN(auxiliarId)) {
+    return res.status(400).json({ error: 'ID de auxiliar inválido' });
+  }
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ error: 'El campo activo debe ser un valor booleano' });
+  }
+  if (!fecha_creacion || isNaN(Date.parse(fecha_creacion))) {
+    return res.status(400).json({ error: 'La fecha de creación debe ser válida' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'El email debe ser válido' });
+  }
+  if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
+    return res.status(400).json({ error: 'El nombre debe tener al menos 2 caracteres' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -131,6 +154,9 @@ router.delete('/:id', (req, res) => {
 
   const query = 'DELETE FROM auxiliar WHERE id = $1 RETURNING *';
   const values = [auxiliarId];
+  if (!auxiliarId || isNaN(auxiliarId)) {
+    return res.status(400).json({ error: 'ID de auxiliar inválido' });
+  }
 
  pool.query(query, values, (err, result) => {
     if (err) {

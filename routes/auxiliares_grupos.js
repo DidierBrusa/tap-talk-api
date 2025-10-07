@@ -24,6 +24,9 @@ router.get('/auxiliares/:id/grupos', (req, res) => {
     FROM auxiliar_grupo ag
     JOIN grupo ON ag.grupo_id = grupo.id
     WHERE ag.auxiliar_id = $1`;
+    if (!auxiliarId || isNaN(auxiliarId)) {
+      return res.status(400).json({ error: 'ID de auxiliar inválido' });
+    }
 
   pool.query(query, [auxiliarId], (err, result) => {
     if (err) {
@@ -61,6 +64,18 @@ router.post('/', (req, res) => {
     RETURNING *`;
 
   const values = [auxiliar_id, grupo_id, es_administrador, es_creador, fecha_vinculacion];
+  if (!Number.isInteger(auxiliar_id) || !Number.isInteger(grupo_id) || auxiliar_id <= 0 || grupo_id <= 0) {
+    return res.status(400).json({ error: 'Los IDs deben ser números enteros positivos' });
+  }
+
+  if (typeof es_administrador !== 'boolean' || typeof es_creador !== 'boolean') {
+    return res.status(400).json({ error: 'es_administrador y es_creador deben ser valores booleanos' });
+  }
+
+  const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!fechaRegex.test(fecha_vinculacion)) {
+    return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -91,6 +106,9 @@ router.delete('/', (req, res) => {
     DELETE FROM auxiliar_grupo
     WHERE auxiliar_id = $1 AND grupo_id = $2
     RETURNING *`;
+  if (!Number.isInteger(auxiliar_id) || !Number.isInteger(grupo_id) || auxiliar_id <= 0 || grupo_id <= 0) {
+    return res.status(400).json({ error: 'Los IDs deben ser números enteros positivos' });
+  }
 
   pool.query(query, [auxiliar_id, grupo_id], (err, result) => {
     if (err) {

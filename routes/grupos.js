@@ -32,6 +32,9 @@ module.exports = router;
 //ENDPOINT "LISTAR SEGUN ID" (GET):
 router.get('/:id', function (req, res) {
   const grupoId = req.params.id; // Extrae el id de la URL
+  if (!Number.isInteger(parseInt(grupoId)) || grupoId <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
 
   pool.query('SELECT * FROM grupo WHERE id = $1', [grupoId], (err, result) => {
     if (err) {
@@ -64,8 +67,12 @@ router.post('/', function (req, res) {
 
   const codigo_vinculacion = generarCodigoVinculacion();
 
-  if (!creador_id || !nombre_paciente) {
-    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  if (!creador_id || typeof creador_id !== 'number' || creador_id <= 0) {
+    return res.status(400).json({ error: 'El ID del creador debe ser un número positivo' });
+  }
+
+  if (!nombre_paciente || typeof nombre_paciente !== 'string' || nombre_paciente.trim().length === 0) {
+    return res.status(400).json({ error: 'El nombre del paciente es requerido y debe ser texto' });
   }
 
   const query = `
@@ -92,18 +99,30 @@ router.put('/:id', function (req, res) {
   const grupoId = req.params.id;
   const { codigo_vinculacion, creador_id, nombre_paciente } = req.body;
 
-  if (!codigo_vinculacion || !creador_id || !nombre_paciente) {
-    return res.status(400).json({ error: 'Faltan datos obligatorios para actualizar el grupo' });
+  if (!Number.isInteger(parseInt(grupoId)) || grupoId <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
+
+  if (!codigo_vinculacion || typeof codigo_vinculacion !== 'string' || codigo_vinculacion.length !== 16 || !/^[A-Za-z0-9]+$/.test(codigo_vinculacion)) {
+    return res.status(400).json({ error: 'Código de vinculación debe ser alfanumérico de 16 caracteres' });
+  }
+
+  if (!creador_id || typeof creador_id !== 'number' || !Number.isInteger(creador_id) || creador_id <= 0) {
+    return res.status(400).json({ error: 'ID del creador debe ser un número entero positivo' });
+  }
+
+  if (!nombre_paciente || typeof nombre_paciente !== 'string' || nombre_paciente.trim().length < 2 || nombre_paciente.trim().length > 100) {
+    return res.status(400).json({ error: 'Nombre del paciente debe tener entre 2 y 100 caracteres' });
   }
 
   const query = `
-    UPDATE grupo
+    UPDATE grupo 
     SET codigo_vinculacion = $1,
         creador_id = $2,
         nombre_paciente = $3
     WHERE id = $4
     RETURNING *`;
-  const values = [codigo_vinculacion, creador_id, nombre_paciente, grupoId];
+  const values = [codigo_vinculacion, creador_id, nombre_paciente.trim(), grupoId];
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -127,6 +146,9 @@ router.delete('/:id', function (req, res) {
 
   const query = 'DELETE FROM grupo WHERE id = $1 RETURNING *';
   const values = [grupoId];
+  if (!Number.isInteger(parseInt(grupoId)) || grupoId <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -143,7 +165,11 @@ router.delete('/:id', function (req, res) {
 // GET /api/grupos/:id/codigo-vinculacion → Obtener código de vinculacion de un grupo
 
 router.get('/:id/codigo-vinculacion', async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id;
+
+  if (!Number.isInteger(parseInt(id)) || id <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
 
   try {
     const result = await pool.query(
@@ -152,7 +178,11 @@ router.get('/:id/codigo-vinculacion', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ mensaje: 'Grupo no encontrado' });
+      return res.status(404).json({ error: 'Grupo no encontrado' });
+    }
+
+    if (!result.rows[0].codigo_vinculacion) {
+      return res.status(404).json({ error: 'Código de vinculación no encontrado' });
     }
 
     res.json({ codigo_vinculacion: result.rows[0].codigo_vinculacion });
@@ -166,6 +196,10 @@ router.get('/:id/codigo-vinculacion', async (req, res) => {
 // GET /api/grupos/codigo/:codigo_vinculacion → Obtener grupo por código de vinculación
 router.get('/codigo/:codigo_vinculacion', async (req, res) => {
   const { codigo_vinculacion } = req.params;
+
+  if (!codigo_vinculacion || typeof codigo_vinculacion !== 'string' || codigo_vinculacion.length !== 16 || !/^[A-Za-z0-9]+$/.test(codigo_vinculacion)) {
+    return res.status(400).json({ error: 'Código de vinculación debe ser alfanumérico de 16 caracteres' });
+  }
 
   try {
     const result = await pool.query(
@@ -190,18 +224,55 @@ router.post('/:id/vincular-auxiliar', async (req, res) => {
   const grupoId = req.params.id;
   const { auxiliar_id } = req.body;
 
-  if (!auxiliar_id) {
-    return res.status(400).json({ error: 'Falta el id del auxiliar a vincular' });
+  if (!Number.isInteger(parseInt(grupoId)) || grupoId <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
+
+  if (!auxiliar_id || !Number.isInteger(parseInt(auxiliar_id)) || auxiliar_id <= 0) {
+    return res.status(400).json({ error: 'ID de auxiliar inválido' });
   }
 
   try {
-    // Obtener la fecha actual en UTC-3 (Argentina)
+    const grupoExiste = await pool.query(
+      'SELECT id, creador_id FROM grupo WHERE id = $1', 
+      [grupoId]
+    );
+    
+    if (grupoExiste.rows.length === 0) {
+      return res.status(404).json({ error: 'Grupo no encontrado' });
+    }
+
+    if (grupoExiste.rows[0].creador_id === auxiliar_id) {
+      return res.status(400).json({ error: 'El creador del grupo no puede ser vinculado como auxiliar' });
+    }
+
+    const auxiliarExiste = await pool.query(
+      'SELECT id, rol FROM usuario WHERE id = $1', 
+      [auxiliar_id]
+    );
+    
+    if (auxiliarExiste.rows.length === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+
+    if (auxiliarExiste.rows[0].rol !== 'auxiliar') {
+      return res.status(400).json({ error: 'El usuario debe tener rol de auxiliar' });
+    }
+
+    const vinculacionExistente = await pool.query(
+      'SELECT id FROM auxiliar_grupo WHERE grupo_id = $1 AND auxiliar_id = $2',
+      [grupoId, auxiliar_id]
+    );
+
+    if (vinculacionExistente.rows.length > 0) {
+      return res.status(409).json({ error: 'Ya existe una vinculación entre el auxiliar y el grupo' });
+    }
+
     const fechaVinculacion = new Date(Date.now() - 3 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 19)
       .replace('T', ' ');
 
-    // Insertar en auxiliar_grupo con los valores adicionales
     const result = await pool.query(
       `INSERT INTO auxiliar_grupo 
         (grupo_id, auxiliar_id, es_administrador, es_creador, fecha_vinculacion) 
