@@ -1,17 +1,13 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
+const authMiddleware = require('../middleware/auth');
 
 // ----------------------------------------------
 
 //ENDPOINT "LISTAR TODO" (GET):
 
-router.get('/', (req, res) => {
+router.get('/', authMiddleware, (req, res) => {
   pool.query('SELECT * FROM categoria', (err, result) => {
     if (err) {
       console.error('❌ Error al obtener categorías:', err);

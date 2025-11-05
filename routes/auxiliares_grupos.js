@@ -1,41 +1,76 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
 
 // ----------------------------------------------
 
 //ENDPOINT "LISTAR SEGUN ID" (GET) GRUPOS A LOS QUE PERTENECE UN AUXILIAR:
+// Acepta tanto el ID entero como el UUID del usuario
+// Busca tanto en auxiliar_grupo como en grupos donde es creador
 
-router.get('/auxiliares/:id/grupos', (req, res) => {
-  const auxiliarId = req.params.id;
+router.get('/:id/grupos', async (req, res) => {
+  const auxiliarIdOrUuid = req.params.id;
 
-  const query = `
-    SELECT
-      grupo.id AS grupo_id,
-      grupo.nombre_paciente,
-      ag.es_administrador,
-      ag.es_creador,
-      ag.fecha_vinculacion
-    FROM auxiliar_grupo ag
-    JOIN grupo ON ag.grupo_id = grupo.id
-    WHERE ag.auxiliar_id = $1`;
-    if (!auxiliarId || isNaN(auxiliarId)) {
-      return res.status(400).json({ error: 'ID de auxiliar inválido' });
+  try {
+    let userUuid;
+
+    // Verificar si es un UUID (contiene guiones)
+    if (auxiliarIdOrUuid.includes('-')) {
+      // Es un UUID
+      userUuid = auxiliarIdOrUuid;
+      
+      // Verificar que el auxiliar existe
+      const auxiliarQuery = 'SELECT user_id FROM auxiliar WHERE user_id = $1';
+      const auxiliarResult = await pool.query(auxiliarQuery, [userUuid]);
+      
+      if (auxiliarResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Auxiliar no encontrado' });
+      }
+    } else {
+      // Es un ID entero, obtener el UUID
+      if (isNaN(auxiliarIdOrUuid)) {
+        return res.status(400).json({ error: 'ID de auxiliar inválido' });
+      }
+      
+      const auxiliarQuery = 'SELECT user_id FROM auxiliar WHERE id = $1';
+      const auxiliarResult = await pool.query(auxiliarQuery, [parseInt(auxiliarIdOrUuid)]);
+      
+      if (auxiliarResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Auxiliar no encontrado' });
+      }
+      
+      userUuid = auxiliarResult.rows[0].user_id;
     }
 
-  pool.query(query, [auxiliarId], (err, result) => {
-    if (err) {
-      console.error('❌ Error al obtener grupos:', err);
-      return res.status(500).json({ error: 'Error al obtener grupos del auxiliar' });
-    }
+    // Buscar grupos donde el usuario es creador O está en auxiliar_grupo
+    const query = `
+      SELECT DISTINCT
+        g.id,
+        g.nombre_paciente,
+        g.codigo_vinculacion,
+        g.fecha_creacion,
+        g.creador_id,
+        CASE 
+          WHEN g.creador_id = $1 THEN true
+          ELSE COALESCE(ag.es_administrador, false)
+        END as es_administrador,
+        CASE 
+          WHEN g.creador_id = $1 THEN true
+          ELSE COALESCE(ag.es_creador, false)
+        END as es_creador,
+        COALESCE(ag.fecha_vinculacion, g.fecha_creacion) as fecha_vinculacion
+      FROM grupo g
+      LEFT JOIN auxiliar a ON a.user_id = $1
+      LEFT JOIN auxiliar_grupo ag ON ag.grupo_id = g.id AND ag.auxiliar_id = a.id
+      WHERE g.creador_id = $1 OR ag.auxiliar_id = a.id`;
 
+    const result = await pool.query(query, [userUuid]);
     res.json(result.rows);
-  });
+    
+  } catch (err) {
+    console.error('❌ Error al obtener grupos:', err);
+    res.status(500).json({ error: 'Error al obtener grupos del auxiliar' });
+  }
 });
 
 module.exports = router;

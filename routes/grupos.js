@@ -1,11 +1,6 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
 
 // ----------------------------------------------
 
@@ -36,14 +31,36 @@ router.get('/:id', function (req, res) {
     return res.status(400).json({ error: 'ID de grupo inválido' });
   }
 
-  pool.query('SELECT * FROM grupo WHERE id = $1', [grupoId], (err, result) => {
+  const query = `
+    SELECT 
+      g.*,
+      json_agg(json_build_object(
+        'id', a.id,
+        'nombre', a.nombre,
+        'email', a.email,
+        'es_administrador', ag.es_administrador,
+        'es_creador', ag.es_creador,
+        'fecha_vinculacion', ag.fecha_vinculacion
+      )) as miembros
+    FROM grupo g
+    LEFT JOIN auxiliar_grupo ag ON g.id = ag.grupo_id
+    LEFT JOIN auxiliar a ON ag.auxiliar_id = a.id
+    WHERE g.id = $1
+    GROUP BY g.id`;
+
+  pool.query(query, [grupoId], (err, result) => {
     if (err) {
       console.error('❌ Error al consultar el grupo:', err);
       res.status(500).json({ error: 'Error al obtener el grupo' });
     } else if (result.rows.length === 0) {
       res.status(404).json({ error: 'Grupo no encontrado' });
     } else {
-      res.json(result.rows[0]); // Devuelve el grupo encontrado
+      // Si no hay miembros, convertir null a array vacío
+      const grupo = result.rows[0];
+      if (grupo.miembros[0] === null) {
+        grupo.miembros = [];
+      }
+      res.json(grupo); // Devuelve el grupo con sus miembros
     }
   });
 });
@@ -67,8 +84,9 @@ router.post('/', function (req, res) {
 
   const codigo_vinculacion = generarCodigoVinculacion();
 
-  if (!creador_id || typeof creador_id !== 'number' || creador_id <= 0) {
-    return res.status(400).json({ error: 'El ID del creador debe ser un número positivo' });
+  // creador_id ahora es un UUID (VARCHAR) que referencia auxiliar.user_id
+  if (!creador_id || typeof creador_id !== 'string') {
+    return res.status(400).json({ error: 'El ID del creador es requerido y debe ser un UUID' });
   }
 
   if (!nombre_paciente || typeof nombre_paciente !== 'string' || nombre_paciente.trim().length === 0) {
