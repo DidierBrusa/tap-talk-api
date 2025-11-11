@@ -2,21 +2,32 @@ const { supabase } = require('../db');
 
 const authMiddleware = async (req, res, next) => {
     try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const authHeader = req.headers.authorization;
+        let token = null;
         
-        if (error) {
-            throw error;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7);
         }
 
-        if (!session) {
+        if (!token) {
             return res.status(401).json({
                 success: false,
-                error: 'Usuario no autenticado API'
+                error: 'Token no proporcionado'
+            });
+        }
+
+        // Verificar el token con Supabase
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        if (error || !user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Token inválido o expirado'
             });
         }
 
         // Agregar la información del usuario a la request
-        req.user = session.user;
+        req.user = user;
         next();
     } catch (error) {
         console.error('Error de autenticación:', error.message);

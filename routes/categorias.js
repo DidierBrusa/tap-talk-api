@@ -6,8 +6,8 @@ const authMiddleware = require('../middleware/auth');
 // ----------------------------------------------
 
 //ENDPOINT "LISTAR TODO" (GET):
-
-router.get('/', authMiddleware, (req, res) => {
+// Sin authMiddleware porque lo usa el Usuario Asistido (sin cuenta)
+router.get('/', (req, res) => {
   pool.query('SELECT * FROM categoria', (err, result) => {
     if (err) {
       console.error('❌ Error al obtener categorías:', err);

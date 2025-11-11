@@ -48,20 +48,17 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const {
     pictograma_id,
-    titulo,
-    fecha_creacion,
-    categoria,
     grupo_id,
-    fecha_resuelta,
-    miembro_resolutor
+    contenido,
+    tipo
   } = req.body;
-  console.log(req.body)
+  
+  console.log('📝 Creando notificación:', req.body);
+  
   const missingFields = [];
   if (!pictograma_id) missingFields.push('pictograma_id');
-  if (!titulo) missingFields.push('titulo');
-  if (!fecha_creacion) missingFields.push('fecha_creacion');
-  if (!categoria) missingFields.push('categoria');
   if (!grupo_id) missingFields.push('grupo_id');
+  if (!contenido) missingFields.push('contenido');
 
   if (missingFields.length > 0) {
     return res.status(400).json({ 
@@ -70,17 +67,16 @@ router.post('/', (req, res) => {
   }
 
   const query = `
-    INSERT INTO notificacion (pictograma_id, titulo, fecha_creacion, categoria, grupo_id, fecha_resuelta, miembro_resolutor)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO notificacion (pictograma_id, grupo_id, contenido, tipo, estado, fecha_hora)
+    VALUES ($1, $2, $3, $4, $5, NOW())
     RETURNING *`;
   const values = [
     pictograma_id,
-    titulo,
-    fecha_creacion,
-    categoria,
+    pictograma_id,
     grupo_id,
-    fecha_resuelta || null,
-    miembro_resolutor || null
+    contenido,
+    tipo || 'PICTOGRAMA',
+    'PENDIENTE'
   ];
 
   pool.query(query, values, (err, result) => {
@@ -88,6 +84,7 @@ router.post('/', (req, res) => {
       console.error('❌ Error al crear notificación:', err);
       res.status(500).json({ error: 'Error al crear la notificación' });
     } else {
+      console.log('✅ Notificación creada:', result.rows[0]);
       res.status(201).json(result.rows[0]); // Devuelve la notificación creada
     }
   });

@@ -237,6 +237,73 @@ router.get('/codigo/:codigo_vinculacion', async (req, res) => {
 });
 
 
+// POST /api/grupos/:id/auxiliares → Agregar un auxiliar a un grupo (UUID-based)
+router.post('/:id/auxiliares', async (req, res) => {
+  const grupoId = req.params.id;
+  const { auxiliar_id, es_administrador } = req.body;
+
+  if (!Number.isInteger(parseInt(grupoId)) || grupoId <= 0) {
+    return res.status(400).json({ error: 'ID de grupo inválido' });
+  }
+
+  // auxiliar_id es un UUID (string)
+  if (!auxiliar_id || typeof auxiliar_id !== 'string') {
+    return res.status(400).json({ error: 'auxiliar_id (UUID) es requerido' });
+  }
+
+  try {
+    // Verificar que el grupo existe
+    const grupoExiste = await pool.query(
+      'SELECT id, creador_id FROM grupo WHERE id = $1', 
+      [grupoId]
+    );
+    
+    if (grupoExiste.rows.length === 0) {
+      return res.status(404).json({ error: 'Grupo no encontrado' });
+    }
+
+    // Verificar que el auxiliar existe (buscar por user_id en tabla auxiliar)
+    const auxiliarResult = await pool.query(
+      'SELECT id, user_id FROM auxiliar WHERE user_id = $1', 
+      [auxiliar_id]
+    );
+    
+    if (auxiliarResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+
+    const auxiliarDbId = auxiliarResult.rows[0].id; // ID numérico en la tabla auxiliar
+
+    // Verificar si ya está vinculado
+    const vinculacionExistente = await pool.query(
+      'SELECT id FROM auxiliar_grupo WHERE grupo_id = $1 AND auxiliar_id = $2',
+      [grupoId, auxiliarDbId]
+    );
+
+    if (vinculacionExistente.rows.length > 0) {
+      return res.status(409).json({ error: 'Ya existe una vinculación entre el auxiliar y el grupo' });
+    }
+
+    // Crear vinculación
+    const result = await pool.query(
+      `INSERT INTO auxiliar_grupo 
+        (grupo_id, auxiliar_id, es_administrador, es_creador) 
+       VALUES ($1, $2, $3, false) 
+       RETURNING *`,
+      [grupoId, auxiliarDbId, es_administrador || false]
+    );
+
+    res.status(201).json({ mensaje: 'Auxiliar vinculado exitosamente', vinculo: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Ya existe una vinculación entre el auxiliar y el grupo' });
+    }
+    console.error('Error al vincular auxiliar:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+
 // POST /api/grupos/:id/vincular-miembro → Asociar un nuevo miembro a un grupo
 router.post('/:id/vincular-auxiliar', async (req, res) => {
   const grupoId = req.params.id;

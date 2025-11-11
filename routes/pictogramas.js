@@ -46,7 +46,7 @@ router.get('/:id', (req, res) => {
 //ENDPOINT PARA "CREAR O AGREGAR" (POST):
 
 router.post('/', (req, res) => {
-  const { nombre, imagen, categoria_id } = req.body;
+  const { nombre, imagen_url, categoria_id } = req.body;
 
   const errors = [];
 
@@ -56,8 +56,8 @@ router.post('/', (req, res) => {
     errors.push('El nombre no puede exceder los 100 caracteres');
   }
 
-  if (imagen !== undefined && typeof imagen !== 'string') {
-    errors.push('La imagen debe ser una cadena de texto');
+  if (imagen_url !== undefined && typeof imagen_url !== 'string') {
+    errors.push('La imagen_url debe ser una cadena de texto');
   }
 
   if (categoria_id !== undefined && categoria_id !== null) {
@@ -73,10 +73,10 @@ router.post('/', (req, res) => {
   }
 
   const query = `
-    INSERT INTO pictograma (nombre, imagen, categoria_id)
+    INSERT INTO pictograma (nombre, imagen_url, categoria_id)
     VALUES ($1, $2, $3)
     RETURNING *`;
-  const values = [nombre, imagen || null, categoria_id || null];
+  const values = [nombre, imagen_url || null, categoria_id || null];
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -96,7 +96,7 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   const pictogramaId = req.params.id;
-  const { nombre, imagen, categoria_id } = req.body;
+  const { nombre, imagen_url, categoria_id } = req.body;
 
   const errors = [];
 
@@ -106,8 +106,8 @@ router.put('/:id', (req, res) => {
     errors.push('El nombre no puede exceder los 100 caracteres');
   }
 
-  if (imagen !== undefined && typeof imagen !== 'string') {
-    errors.push('La imagen debe ser una cadena de texto');
+  if (imagen_url !== undefined && typeof imagen_url !== 'string') {
+    errors.push('La imagen_url debe ser una cadena de texto');
   }
 
   if (categoria_id !== undefined && categoria_id !== null) {
@@ -125,11 +125,11 @@ router.put('/:id', (req, res) => {
   const query = `
     UPDATE pictograma
     SET nombre = $1,
-        imagen = $2,
+        imagen_url = $2,
         categoria_id = $3
     WHERE id = $4
     RETURNING *`;
-  const values = [nombre, imagen || null, categoria_id || null, pictogramaId];
+  const values = [nombre, imagen_url || null, categoria_id || null, pictogramaId];
 
   pool.query(query, values, (err, result) => {
     if (err) {
