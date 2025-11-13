@@ -72,7 +72,6 @@ router.post('/', (req, res) => {
     RETURNING *`;
   const values = [
     pictograma_id,
-    pictograma_id,
     grupo_id,
     contenido,
     tipo || 'PICTOGRAMA',
@@ -101,59 +100,60 @@ router.put('/:id', (req, res) => {
     return res.status(400).json({ error: 'ID de notificación inválido' });
   }
 
-  const { pictograma_id, titulo, fecha_creacion, categoria, grupo_id, fecha_resuelta, miembro_resolutor } = req.body;
+  const { pictograma_id, contenido, tipo, estado, grupo_id } = req.body;
 
-  const missingFields = [];
-  if (!pictograma_id) missingFields.push('pictograma_id');
-  if (!titulo) missingFields.push('titulo');
-  if (!fecha_creacion) missingFields.push('fecha_creacion');
-  if (!categoria) missingFields.push('categoria');
-  if (!grupo_id) missingFields.push('grupo_id');
+  // Construir la query dinámicamente solo con los campos proporcionados
+  const updates = [];
+  const values = [];
+  let paramIndex = 1;
 
-  if (missingFields.length > 0) {
-    return res.status(400).json({ 
-      error: `Faltan los siguientes campos obligatorios: ${missingFields.join(', ')}` 
-    });
+  if (pictograma_id !== undefined) {
+    if (isNaN(pictograma_id)) {
+      return res.status(400).json({ error: 'pictograma_id debe ser un número' });
+    }
+    updates.push(`pictograma_id = $${paramIndex}`);
+    values.push(pictograma_id);
+    paramIndex++;
   }
 
-  if (pictograma_id && isNaN(pictograma_id)) {
-    return res.status(400).json({ error: 'pictograma_id debe ser un número' });
+  if (contenido !== undefined) {
+    updates.push(`contenido = $${paramIndex}`);
+    values.push(contenido);
+    paramIndex++;
   }
 
-  if (grupo_id && isNaN(grupo_id)) {
-    return res.status(400).json({ error: 'grupo_id debe ser un número' });
+  if (tipo !== undefined) {
+    updates.push(`tipo = $${paramIndex}`);
+    values.push(tipo);
+    paramIndex++;
   }
 
-  if (fecha_creacion && !Date.parse(fecha_creacion)) {
-    return res.status(400).json({ error: 'fecha_creacion debe ser una fecha válida' });
+  if (estado !== undefined) {
+    updates.push(`estado = $${paramIndex}`);
+    values.push(estado);
+    paramIndex++;
   }
 
-  if (fecha_resuelta && !Date.parse(fecha_resuelta)) {
-    return res.status(400).json({ error: 'fecha_resuelta debe ser una fecha válida' });
+  if (grupo_id !== undefined) {
+    if (isNaN(grupo_id)) {
+      return res.status(400).json({ error: 'grupo_id debe ser un número' });
+    }
+    updates.push(`grupo_id = $${paramIndex}`);
+    values.push(grupo_id);
+    paramIndex++;
   }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+  }
+
+  values.push(notificacionId);
 
   const query = `
     UPDATE notificacion
-    SET pictograma_id = $1,
-        titulo = $2,
-        fecha_creacion = $3,
-        categoria = $4,
-        grupo_id = $5,
-        fecha_resuelta = $6,
-        miembro_resolutor = $7
-    WHERE id = $8
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}
     RETURNING *`;
-    
-  const values = [
-    pictograma_id,
-    titulo,
-    fecha_creacion,
-    categoria,
-    grupo_id,
-    fecha_resuelta || null,
-    miembro_resolutor || null,
-    notificacionId
-  ];
 
   pool.query(query, values, (err, result) => {
     if (err) {
