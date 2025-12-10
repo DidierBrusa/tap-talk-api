@@ -101,6 +101,16 @@ app.use('/api/pictogramas', pictogramasRoutes);
 const auxiliarGrupoRoutes = require('./routes/auxiliares_grupos');
 app.use('/api/auxiliares-grupos', auxiliarGrupoRoutes);
 
+// Catch-all para rutas no encontradas (debe ir al final, antes de listen)
+app.use('*', (req, res) => {
+  console.log(`⚠️ Ruta no encontrada: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ 
+    error: 'Ruta no encontrada',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
 // Escuchar en todas las interfaces (0.0.0.0)
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('\n🚀 Servidor iniciado:');
