@@ -42,6 +42,17 @@ app.get('/', (req, res) => {
   res.send('¡La API de Tap-Talk está funcionando!');
 });
 
+app.get('/health', (req, res) => {
+  console.log('🏥 Health check endpoint accessed');
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.get('/test', (req, res) => {
   res.json({
     success: true,
