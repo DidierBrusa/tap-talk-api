@@ -53,6 +53,8 @@ app.get('/test', (req, res) => {
 
 // Puerto donde se ejecuta la API
 const PORT = process.env.PORT || 3000;
+console.log('🔍 DEBUG - process.env.PORT:', process.env.PORT);
+console.log('🔍 DEBUG - PORT final:', PORT);
 
 // Conectamos la ruta /api con los archivos correspondientes (grupos, pictogramas, notificaciones, auxiliares)
 const gruposRoutes = require('./routes/grupos');
