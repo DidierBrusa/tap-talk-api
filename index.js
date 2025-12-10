@@ -129,4 +129,40 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('2. Android Emulator:');
   console.log(`   http://10.0.2.2:${PORT}`);
   console.log('------------------------\n');
+  console.log('✅ Servidor listo para recibir peticiones');
+  
+  // Self-ping para confirmar que el servidor responde
+  setTimeout(() => {
+    const http = require('http');
+    const options = {
+      hostname: 'localhost',
+      port: PORT,
+      path: '/health',
+      method: 'GET'
+    };
+    
+    const req = http.request(options, (res) => {
+      console.log('✅ Self-check exitoso - servidor respondiendo correctamente');
+    });
+    
+    req.on('error', (e) => {
+      console.error('❌ Self-check falló:', e.message);
+    });
+    
+    req.end();
+  }, 1000);
+});
+
+// Configurar timeouts y keepalive
+server.keepAliveTimeout = 65000; // 65 segundos
+server.headersTimeout = 66000; // 66 segundos
+
+// Log cuando el servidor cierra
+server.on('close', () => {
+  console.log('❌ Servidor cerrado');
+});
+
+// Manejar errores del servidor
+server.on('error', (err) => {
+  console.error('❌ Error en el servidor:', err);
 });
