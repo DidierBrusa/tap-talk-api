@@ -1,11 +1,6 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
 
 // ----------------------------------------------
 
@@ -30,6 +25,9 @@ module.exports = router;
 
 router.get('/:id', (req, res) => {
   const notificacionId = req.params.id;
+  if (!notificacionId || isNaN(notificacionId)) {
+    return res.status(400).json({ error: 'ID de notificación inválido' });
+  }
 
   pool.query('SELECT * FROM notificacion WHERE id = $1', [notificacionId], (err, result) => {
     if (err) {
@@ -50,20 +48,17 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const {
     pictograma_id,
-    titulo,
-    fecha_creacion,
-    categoria,
     grupo_id,
-    fecha_resuelta,
-    miembro_resolutor
+    contenido,
+    tipo
   } = req.body;
-  console.log(req.body)
+  
+  console.log('📝 Creando notificación:', req.body);
+  
   const missingFields = [];
   if (!pictograma_id) missingFields.push('pictograma_id');
-  if (!titulo) missingFields.push('titulo');
-  if (!fecha_creacion) missingFields.push('fecha_creacion');
-  if (!categoria) missingFields.push('categoria');
   if (!grupo_id) missingFields.push('grupo_id');
+  if (!contenido) missingFields.push('contenido');
 
   if (missingFields.length > 0) {
     return res.status(400).json({ 
@@ -72,17 +67,15 @@ router.post('/', (req, res) => {
   }
 
   const query = `
-    INSERT INTO notificacion (pictograma_id, titulo, fecha_creacion, categoria, grupo_id, fecha_resuelta, miembro_resolutor)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO notificacion (pictograma_id, grupo_id, contenido, tipo, estado, fecha_hora)
+    VALUES ($1, $2, $3, $4, $5, NOW())
     RETURNING *`;
   const values = [
     pictograma_id,
-    titulo,
-    fecha_creacion,
-    categoria,
     grupo_id,
-    fecha_resuelta || null,
-    miembro_resolutor || null
+    contenido,
+    tipo || 'PICTOGRAMA',
+    'PENDIENTE'
   ];
 
   pool.query(query, values, (err, result) => {
@@ -90,6 +83,7 @@ router.post('/', (req, res) => {
       console.error('❌ Error al crear notificación:', err);
       res.status(500).json({ error: 'Error al crear la notificación' });
     } else {
+      console.log('✅ Notificación creada:', result.rows[0]);
       res.status(201).json(result.rows[0]); // Devuelve la notificación creada
     }
   });
@@ -101,34 +95,73 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   const notificacionId = req.params.id;
-  const { pictograma_id, contenido, estado, fecha_hora, tipo, grupo_id } = req.body;
-
-  if (!contenido || !estado || !fecha_hora || !tipo) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios para actualizar' });
+  
+  if (!notificacionId || isNaN(notificacionId)) {
+    return res.status(400).json({ error: 'ID de notificación inválido' });
   }
+
+  const { pictograma_id, contenido, tipo, estado, grupo_id } = req.body;
+
+  // Construir la query dinámicamente solo con los campos proporcionados
+  const updates = [];
+  const values = [];
+  let paramIndex = 1;
+
+  if (pictograma_id !== undefined) {
+    if (isNaN(pictograma_id)) {
+      return res.status(400).json({ error: 'pictograma_id debe ser un número' });
+    }
+    updates.push(`pictograma_id = $${paramIndex}`);
+    values.push(pictograma_id);
+    paramIndex++;
+  }
+
+  if (contenido !== undefined) {
+    updates.push(`contenido = $${paramIndex}`);
+    values.push(contenido);
+    paramIndex++;
+  }
+
+  if (tipo !== undefined) {
+    updates.push(`tipo = $${paramIndex}`);
+    values.push(tipo);
+    paramIndex++;
+  }
+
+  if (estado !== undefined) {
+    updates.push(`estado = $${paramIndex}`);
+    values.push(estado);
+    paramIndex++;
+  }
+
+  if (grupo_id !== undefined) {
+    if (isNaN(grupo_id)) {
+      return res.status(400).json({ error: 'grupo_id debe ser un número' });
+    }
+    updates.push(`grupo_id = $${paramIndex}`);
+    values.push(grupo_id);
+    paramIndex++;
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+  }
+
+  values.push(notificacionId);
 
   const query = `
     UPDATE notificacion
-    SET pictograma_id = $1,
-        contenido = $2,
-        estado = $3,
-        fecha_hora = $4,
-        tipo = $5,
-        grupo_id = $6
-    WHERE id = $7
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}
     RETURNING *`;
-  const values = [
-    pictograma_id || null,
-    contenido,
-    estado,
-    fecha_hora,
-    tipo,
-    grupo_id || null,
-    notificacionId
-  ];
 
   pool.query(query, values, (err, result) => {
     if (err) {
+      if (err.code === '23503') {
+        return res.status(409).json({ 
+          error: 'El pictograma_id o grupo_id especificado no existe' 
+        });
+      }
       console.error('❌ Error al actualizar notificación:', err);
       res.status(500).json({ error: 'Error al actualizar la notificación' });
     } else if (result.rows.length === 0) {
@@ -147,6 +180,9 @@ router.delete('/:id', (req, res) => {
 
   const query = 'DELETE FROM notificacion WHERE id = $1 RETURNING *';
   const values = [notificacionId];
+  if (!notificacionId || isNaN(notificacionId)) {
+    return res.status(400).json({ error: 'ID de notificación inválido' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {

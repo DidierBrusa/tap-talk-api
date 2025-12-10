@@ -1,11 +1,6 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
 
 // ----------------------------------------------
 
@@ -30,7 +25,10 @@ module.exports = router;
 
 router.get('/:id', (req, res) => {
   const pictogramaId = req.params.id;
-
+  if (!Number.isInteger(parseInt(pictogramaId)) || pictogramaId <= 0) {
+    return res.status(400).json({ error: 'ID de pictograma inválido' });
+  }
+  
   pool.query('SELECT * FROM pictograma WHERE id = $1', [pictogramaId], (err, result) => {
     if (err) {
       console.error('❌ Error al buscar pictograma:', err);
@@ -48,25 +46,47 @@ router.get('/:id', (req, res) => {
 //ENDPOINT PARA "CREAR O AGREGAR" (POST):
 
 router.post('/', (req, res) => {
-  const { nombre, imagen, categoria_id } = req.body;
+  const { nombre, imagen_url, categoria_id } = req.body;
+
+  const errors = [];
 
   if (!nombre) {
-    return res.status(400).json({ error: 'El campo "nombre" es obligatorio' });
+    errors.push('El campo "nombre" es obligatorio');
+  } else if (nombre.length > 100) {
+    errors.push('El nombre no puede exceder los 100 caracteres');
+  }
+
+  if (imagen_url !== undefined && typeof imagen_url !== 'string') {
+    errors.push('La imagen_url debe ser una cadena de texto');
+  }
+
+  if (categoria_id !== undefined && categoria_id !== null) {
+    if (!Number.isInteger(parseInt(categoria_id))) {
+      errors.push('categoria_id debe ser un número entero');
+    } else if (categoria_id <= 0) {
+      errors.push('categoria_id debe ser un número positivo');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ errors });
   }
 
   const query = `
-    INSERT INTO pictograma (nombre, imagen, categoria_id)
+    INSERT INTO pictograma (nombre, imagen_url, categoria_id)
     VALUES ($1, $2, $3)
     RETURNING *`;
-  const values = [nombre, imagen || null, categoria_id || null];
+  const values = [nombre, imagen_url || null, categoria_id || null];
 
   pool.query(query, values, (err, result) => {
     if (err) {
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'La categoría especificada no existe' });
+      }
       console.error('❌ Error al crear pictograma:', err);
-      res.status(500).json({ error: 'Error al crear el pictograma' });
-    } else {
-      res.status(201).json(result.rows[0]);
+      return res.status(500).json({ error: 'Error al crear el pictograma' });
     }
+    res.status(201).json(result.rows[0]);
   });
 });
 
@@ -76,23 +96,46 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   const pictogramaId = req.params.id;
-  const { nombre, imagen, categoria_id } = req.body;
+  const { nombre, imagen_url, categoria_id } = req.body;
+
+  const errors = [];
 
   if (!nombre) {
-    return res.status(400).json({ error: 'El campo "nombre" es obligatorio para actualizar' });
+    errors.push('El campo "nombre" es obligatorio');
+  } else if (nombre.length > 100) {
+    errors.push('El nombre no puede exceder los 100 caracteres');
+  }
+
+  if (imagen_url !== undefined && typeof imagen_url !== 'string') {
+    errors.push('La imagen_url debe ser una cadena de texto');
+  }
+
+  if (categoria_id !== undefined && categoria_id !== null) {
+    if (!Number.isInteger(parseInt(categoria_id))) {
+      errors.push('categoria_id debe ser un número entero');
+    } else if (categoria_id <= 0) {
+      errors.push('categoria_id debe ser un número positivo');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ errors });
   }
 
   const query = `
     UPDATE pictograma
     SET nombre = $1,
-        imagen = $2,
+        imagen_url = $2,
         categoria_id = $3
     WHERE id = $4
     RETURNING *`;
-  const values = [nombre, imagen || null, categoria_id || null, pictogramaId];
+  const values = [nombre, imagen_url || null, categoria_id || null, pictogramaId];
 
   pool.query(query, values, (err, result) => {
     if (err) {
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'La categoría especificada no existe' });
+      }
       console.error('❌ Error al actualizar pictograma:', err);
       res.status(500).json({ error: 'Error al actualizar el pictograma' });
     } else if (result.rows.length === 0) {
@@ -109,12 +152,15 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const pictogramaId = req.params.id;
 
+  if (!Number.isInteger(parseInt(pictogramaId)) || pictogramaId <= 0) {
+    return res.status(400).json({ error: 'ID de pictograma inválido' });
+  }
+
   const query = 'DELETE FROM pictograma WHERE id = $1 RETURNING *';
   const values = [pictogramaId];
 
   pool.query(query, values, (err, result) => {
     if (err) {
-      // Error por clave foránea (por ejemplo, si está en una notificación)
       if (err.code === '23503') {
         return res.status(409).json({
           error: 'No se puede eliminar el pictograma porque está vinculado a otros datos.'

@@ -1,0 +1,33 @@
+INSERT INTO categoria (nombre, color, imagen) VALUES
+('Basicas',      '#E0E0E0', 'basics.jpg'      ),
+('Emociones',    '#FFEB3B', 'emotions.jpg'    ),
+('Social',       '#FF9800', 'social.jpg'      ),
+('Actividades',  '#2196F3', 'activity.jpg'    ),
+('Preferencias', '#3F51B5', 'preferences.jpg' ),
+('Ayuda',        '#9C27B0', 'help.jpg'        );
+
+INSERT INTO pictograma (nombre, icono, categoria_id) VALUES
+('Comida',           'restaurant', 1),
+('Agua',             'local-drink', 1),
+('Baño',             'wc', 1),
+('Dormir',           'bed', 1),
+('Feliz',            'sentiment-satisfied-alt', 2),
+('Triste',           'sentiment-dissatisfied', 2),
+('Ansioso',          'sentiment-very-dissatisfied', 2),
+('Dolor',            'sick', 2),
+('Saludar',          'emoji-people', 3),
+('Gracias',          'volunteer-activism', 3),
+('Ayuda',            'help-outline', 3),
+('Llamar',           'call', 3),
+('Leer',             'menu-book', 4),
+('Caminar',          'directions-walk', 4),
+('Ver TV',           'tv', 4),
+('Jugar',            'sports-esports', 4),
+('Me gusta',         'thumb-up', 5),
+('No me gusta',      'thumb-down', 5),
+('Quiero más',       'add-circle-outline', 5),
+('No quiero',        'remove-circle-outline', 5),
+('Andador',          'accessibility', 6),
+('Silla de ruedas',  'accessible', 6),
+('Manta',            'king-bed', 6),
+('Doc',              'medical-services', 6);

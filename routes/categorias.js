@@ -1,16 +1,12 @@
-// Importamos Express, que es el framework para manejar rutas HTTP
 const express = require('express');
-
-// Creamos un "router", que es un objeto que nos permite definir endpoints separados
 const router = express.Router();
-
-// Importamos la conexión a la base de datos desde el archivo db.js
-const pool = require('../db'); // ".." porque subimos un nivel de carpeta
+const { pool } = require('../db');
+const authMiddleware = require('../middleware/auth');
 
 // ----------------------------------------------
 
 //ENDPOINT "LISTAR TODO" (GET):
-
+// Sin authMiddleware porque lo usa el Usuario Asistido (sin cuenta)
 router.get('/', (req, res) => {
   pool.query('SELECT * FROM categoria', (err, result) => {
     if (err) {
@@ -30,6 +26,9 @@ module.exports = router;
 
 router.get('/:id', (req, res) => {
   const categoriaId = req.params.id;
+  if (!Number.isInteger(parseInt(categoriaId)) || parseInt(categoriaId) <= 0) {
+    return res.status(400).json({ error: 'El ID debe ser un número entero positivo' });
+  }
 
   pool.query('SELECT * FROM categoria WHERE id = $1', [categoriaId], (err, result) => {
     if (err) {
@@ -60,6 +59,20 @@ router.post('/', (req, res) => {
     RETURNING *`;
   const values = [nombre, imagen || null];
 
+  if (nombre.trim().length === 0) {
+    return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+  }
+  if (nombre.length > 100) {
+    return res.status(400).json({ error: 'El nombre no puede exceder 100 caracteres' });
+  }
+
+  if (imagen && typeof imagen !== 'string') {
+    return res.status(400).json({ error: 'La imagen debe ser una URL válida' });
+  }
+  if (imagen && imagen.length > 255) {
+    return res.status(400).json({ error: 'La URL de la imagen es demasiado larga' });
+  }
+
   pool.query(query, values, (err, result) => {
     if (err) {
       console.error('❌ Error al crear categoría:', err);
@@ -89,6 +102,25 @@ router.put('/:id', (req, res) => {
     WHERE id = $3
     RETURNING *`;
   const values = [nombre, imagen || null, categoriaId];
+  if (!Number.isInteger(parseInt(categoriaId)) || parseInt(categoriaId) <= 0) {
+    return res.status(400).json({ error: 'El ID debe ser un número entero positivo' });
+  }
+
+  if (nombre.trim().length === 0) {
+    return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+  }
+
+  if (nombre.length > 100) {
+    return res.status(400).json({ error: 'El nombre no puede exceder 100 caracteres' });
+  }
+
+  if (imagen && typeof imagen !== 'string') {
+    return res.status(400).json({ error: 'La imagen debe ser una URL válida' });
+  }
+
+  if (imagen && imagen.length > 255) {
+    return res.status(400).json({ error: 'La URL de la imagen es demasiado larga' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {
@@ -111,6 +143,9 @@ router.delete('/:id', (req, res) => {
 
   const query = 'DELETE FROM categoria WHERE id = $1 RETURNING *';
   const values = [categoriaId];
+  if (!Number.isInteger(parseInt(categoriaId)) || parseInt(categoriaId) <= 0) {
+    return res.status(400).json({ error: 'El ID debe ser un número entero positivo' });
+  }
 
   pool.query(query, values, (err, result) => {
     if (err) {
