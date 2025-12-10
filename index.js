@@ -1,10 +1,14 @@
 const express = require('express');
 const app = express();
 
+// Puerto donde se ejecuta la API (definir temprano)
+const PORT = process.env.PORT || 3000;
+console.log('🔍 DEBUG - process.env.PORT:', process.env.PORT);
+console.log('🔍 DEBUG - PORT final:', PORT);
+
 // DEBUG - Middleware para loggear todas las peticiones
 app.use((req, res, next) => {
-  console.log(`DEBUG - API Request: ${req.method} ${req.url}`);
-  console.log('DEBUG - API Headers:', req.headers);
+  console.log(`📥 [${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
@@ -37,13 +41,23 @@ app.use((req, res, next) => {
 
 // Rutas de prueba
 app.get('/', (req, res) => {
-  console.log('DEBUG - API: Ruta base accedida');
-  console.log('DEBUG - API: Headers:', req.headers);
+  console.log('✅ Ruta base accedida');
   res.send('¡La API de Tap-Talk está funcionando!');
 });
 
 app.get('/health', (req, res) => {
-  console.log('🏥 Health check endpoint accessed');
+  console.log('🏥 Health check endpoint accessed at /health');
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  console.log('🏥 Health check endpoint accessed at /api/health');
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -61,11 +75,6 @@ app.get('/test', (req, res) => {
     headers: req.headers
   });
 });
-
-// Puerto donde se ejecuta la API
-const PORT = process.env.PORT || 3000;
-console.log('🔍 DEBUG - process.env.PORT:', process.env.PORT);
-console.log('🔍 DEBUG - PORT final:', PORT);
 
 // Conectamos la ruta /api con los archivos correspondientes (grupos, pictogramas, notificaciones, auxiliares)
 const gruposRoutes = require('./routes/grupos');
