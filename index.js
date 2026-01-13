@@ -1,8 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const app = express();
 
 // Puerto donde se ejecuta la API (definir temprano)
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 console.log('🔍 DEBUG - process.env.PORT:', process.env.PORT);
 console.log('🔍 DEBUG - PORT final:', PORT);
 
